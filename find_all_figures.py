@@ -1,3 +1,5 @@
+from time import sleep
+
 import numpy as np
 import cv2 as cv
 from urllib.request import urlopen
@@ -21,8 +23,8 @@ def process_figure(img, coordinates):
     cv.grabCut(img, mask, rect, bgd_model, fgd_model, 5, cv.GC_INIT_WITH_RECT)
     mask2 = np.where((mask == 2) | (mask == 0), 0, 1).astype('uint8')
     # todo remove after
-    img = img*mask2[:, :, np.newaxis]
-    plt.imshow(img), plt.colorbar(), plt.show()
+    # img = img*mask2[:, :, np.newaxis]
+    # plt.imshow(img), plt.colorbar(), plt.show()
 
     return mask2
 
@@ -40,12 +42,17 @@ def download_image(url):
     return image
 
 
-def convert_coordinates(json_filepath):
+def convert_coordinates(json_filepath, whole_body=False):
     converted_coordinates = list()
     with open(json_filepath, 'r') as f:
         data_as_dict = json.load(f)
+    # Todo - should_get_whole_body
+    # whole_body = should_get_whole_body(data_as_dict)
     try:
-        figures = data_as_dict["cropHintsAnnotation"]['cropHints']
+        if whole_body:
+            figures = data_as_dict["cropHintsAnnotation"]['cropHints']
+        else:
+            figures = data_as_dict["faceAnnotations"]
     except KeyError:
         return None
 
@@ -65,7 +72,7 @@ def convert_coordinates(json_filepath):
 
 def process_image(image_url, boxes_url):
     img = download_image(image_url)
-    if not img:
+    if img is None:
         return None
     figure_boxes = convert_coordinates(boxes_url)
     if not figure_boxes:
@@ -73,15 +80,19 @@ def process_image(image_url, boxes_url):
     final_mask = np.zeros(img.shape[:2], np.uint8)
     for box in figure_boxes:
         figure_mask = process_figure(img, box)
+        # plt.imshow(figure_mask), plt.colorbar(), plt.show()
+        # sleep(5)
         final_mask = np.bitwise_or(final_mask, figure_mask)
 
     return final_mask
 
 
-# todo call method for each figure
-# todo combine all figures masks
-# todo handle return None
-# todo minimize imports
+image_url = "http://scd.en.rfi.fr/sites/english.filesrfi/imagecache/rfi_16x9_1024_578/sites/images.rfi.fr/files/aefimagesnew/aef_image/2019-03-28t100320z_719753758_rc19f0b34600_rtrmadp_3_algeria-protests-bouteflika.jpg"
+img = download_image(image_url)
+json_url = "json.json"
+final_mask = process_image(image_url, json_url)
+img = img*final_mask[:, :, np.newaxis]
+plt.imshow(img), plt.colorbar(), plt.show()
 
 
 
